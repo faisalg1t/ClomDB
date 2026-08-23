@@ -1,0 +1,12 @@
+function(clomdb_add_test name)
+  add_executable(${name} ${name}.cpp)
+  target_link_libraries(${name} PRIVATE clomdb)
+  target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+clomdb_add_test(coding_test)
+clomdb_add_test(wal_test)
+clomdb_add_test(bloom_test)
+clomdb_add_test(sstable_test)
+clomdb_add_test(db_test)

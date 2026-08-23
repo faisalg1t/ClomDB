@@ -1,0 +1,13 @@
+build/
+build-*/
+*.o
+*.a
+*.sst
+*.wal
+MANIFEST
+MANIFEST.tmp
+CURRENT.wal
+compile_commands.json
+.cache/
+.vscode/
+.idea/
