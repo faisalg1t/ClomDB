@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: clomdb-linux-x86_64
+          - os: macos-latest
+            artifact_name: clomdb-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Package
+        run: |
+          mkdir -p dist/${{ matrix.artifact_name }}/bin
+          mkdir -p dist/${{ matrix.artifact_name }}/lib
+          mkdir -p dist/${{ matrix.artifact_name }}/include
+          cp build/clomdb_cli dist/${{ matrix.artifact_name }}/bin/
+          cp build/clomdb_bench dist/${{ matrix.artifact_name }}/bin/
+          cp build/libclomdb.a dist/${{ matrix.artifact_name }}/lib/
+          cp -r include/clomdb dist/${{ matrix.artifact_name }}/include/
+          cp README.md DESIGN.md LICENSE dist/${{ matrix.artifact_name }}/
+          tar -czf ${{ matrix.artifact_name }}.tar.gz -C dist ${{ matrix.artifact_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifact files
+        run: |
+          mkdir -p out
+          find artifacts -name '*.tar.gz' -exec cp {} out/ \;
+          ls -la out
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.tar.gz
+          generate_release_notes: true
