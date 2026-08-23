@@ -1,3 +1,11 @@
+// Simple interactive/one-shot CLI for ClomDB.
+//
+//   clomdb_cli <db_path> put <key> <value>
+//   clomdb_cli <db_path> get <key>
+//   clomdb_cli <db_path> delete <key>
+//   clomdb_cli <db_path> scan
+//   clomdb_cli <db_path> stats
+//   clomdb_cli <db_path>            (no extra args: interactive REPL)
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -79,7 +87,7 @@ std::vector<std::string> SplitLine(const std::string& line) {
     return tokens;
 }
 
-}
+}  // namespace
 
 int main(int argc, char** argv) {
     if (argc < 2) {

@@ -5,6 +5,8 @@
 
 namespace clomdb {
 
+// Lightweight, allocation-free-on-success Status type used throughout
+// ClomDB instead of exceptions for expected error paths.
 class Status {
 public:
     enum class Code : uint8_t {
@@ -47,4 +49,4 @@ private:
     std::string msg_;
 };
 
-}
+}  // namespace clomdb

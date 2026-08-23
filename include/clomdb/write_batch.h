@@ -7,6 +7,11 @@ namespace clomdb {
 
 enum class RecordType : uint8_t { kPut = 1, kDelete = 2 };
 
+// A WriteBatch groups multiple Put/Delete operations so that they are
+// applied to the memtable and appended to the WAL as a single atomic unit.
+// Serialized form is a flat sequence of:
+//   [1 byte type][varint32 key_len][key bytes]{[varint32 val_len][val bytes]}
+// (the value fields are only present for kPut records).
 class WriteBatch {
 public:
     WriteBatch() = default;
@@ -34,6 +39,8 @@ public:
     const std::string& Data() const { return rep_; }
     void SetData(std::string d) { rep_ = std::move(d); }
 
+    // Invokes handler.Put(key,value) / handler.Delete(key) for each op in
+    // the batch, in order. Handler is any type exposing those two methods.
     template <typename Handler>
     Status Iterate(Handler* handler) const {
         Slice input(rep_);
@@ -67,4 +74,4 @@ private:
     size_t count_ = 0;
 };
 
-}
+}  // namespace clomdb

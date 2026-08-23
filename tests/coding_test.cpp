@@ -44,6 +44,7 @@ CLOMDB_TEST(LengthPrefixedSliceRoundTrip) {
 }
 
 CLOMDB_TEST(Crc32cKnownValue) {
+    // Standard CRC32C check value for the ASCII string "123456789".
     uint32_t crc = CRC32C::Value("123456789", 9);
     CHECK_EQ(crc, 0xE3069283u);
 }

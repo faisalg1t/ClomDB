@@ -26,6 +26,8 @@ struct Registrar {
 inline int failures = 0;
 inline int checks = 0;
 
+// A directory under the OS temp path, unique per test binary invocation,
+// cleaned up (recursively) when the process exits normally.
 inline std::string TempDir() {
     static std::string dir = [] {
         std::filesystem::path base = std::filesystem::temp_directory_path() /
@@ -37,7 +39,7 @@ inline std::string TempDir() {
     return dir;
 }
 
-}
+}  // namespace clomdb::test
 
 #define CLOMDB_TEST(name)                                                     \
     static void clomdb_test_##name();                                        \

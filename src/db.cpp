@@ -12,6 +12,8 @@ namespace clomdb {
 
 namespace {
 
+// Applies a decoded WriteBatch directly to a MemTable. Used both for live
+// writes and for WAL replay during recovery.
 struct MemTableHandler {
     MemTable* mt;
     void Put(const Slice& k, const Slice& v) { mt->Put(k, v); }
@@ -24,9 +26,9 @@ std::string ZeroPad(uint64_t n) {
     return std::string(buf);
 }
 
-constexpr size_t kMinCompactionOutputFileBytes = 2 * 1024 * 1024;
+constexpr size_t kMinCompactionOutputFileBytes = 2 * 1024 * 1024;  // 2 MiB
 
-}
+}  // namespace
 
 std::string DB::SSTablePath(uint64_t number) const {
     return db_path_ + "/" + ZeroPad(number) + ".sst";
@@ -52,11 +54,16 @@ Status DB::Open(const Options& options, const std::string& db_path, DB** dbptr) 
     db->options_ = options;
     db->open_readers_.resize(kMaxLevels);
 
+    // Load manifest if present; otherwise start from an empty Version.
     Status s = db->version_.Load(db->ManifestPath());
     if (!s.ok() && !s.IsNotFound()) {
         return s;
     }
 
+    // Sweep for .sst files on disk that the manifest doesn't reference --
+    // leftovers from a crash between "manifest saved" and "old files
+    // unlinked" during a prior compaction. Harmless to delete: the
+    // manifest is the sole source of truth for what's live.
     {
         std::set<std::string> live;
         for (int lvl = 0; lvl < db->version_.NumLevels(); lvl++) {
@@ -75,6 +82,7 @@ Status DB::Open(const Options& options, const std::string& db_path, DB** dbptr) 
         }
     }
 
+    // Open a reader for every live SSTable.
     for (int lvl = 0; lvl < db->version_.NumLevels(); lvl++) {
         for (const auto& fm : db->version_.Level(lvl)) {
             auto reader = std::make_shared<SSTableReader>();
@@ -84,6 +92,8 @@ Status DB::Open(const Options& options, const std::string& db_path, DB** dbptr) 
         }
     }
 
+    // Replay the WAL (if any) into the memtable to recover writes that
+    // were durable but not yet flushed to an SSTable.
     s = WriteAheadLog::ReplayAll(db->WalPath(), [&](const Slice& record) {
         WriteBatch batch;
         batch.SetData(record.ToString());
@@ -96,6 +106,8 @@ Status DB::Open(const Options& options, const std::string& db_path, DB** dbptr) 
     s = db->wal_->Open(db->WalPath());
     if (!s.ok()) return s;
 
+    // Persist the manifest now if this is a brand new database, so a
+    // reopen immediately after an empty Open() still finds a valid one.
     if (!existed) {
         s = db->version_.Save(db->ManifestPath());
         if (!s.ok()) return s;
@@ -228,6 +240,9 @@ Status DB::FlushMemTableLocked() {
 
     memtable_.Clear();
 
+    // The memtable's contents are now durable in an SSTable, so the WAL
+    // entries covering them are obsolete. Rotate to a fresh, empty WAL
+    // rather than letting it grow unboundedly.
     s = wal_->Close();
     if (!s.ok()) return s;
     std::remove(WalPath().c_str());
@@ -255,11 +270,15 @@ bool DB::NeedsCompactionLocked(int* level_to_compact) const {
 
 Status DB::CompactLocked(int level) {
     int target_level = level + 1;
-    if (target_level >= kMaxLevels) return Status::OK();
+    if (target_level >= kMaxLevels) return Status::OK();  // nothing beyond the last level
 
+    // Gather all entries from `level`, newest file first (only matters
+    // for L0, where files may have overlapping key ranges).
     std::vector<FileMetaData> level_files = version_.Level(level);
     std::vector<std::shared_ptr<SSTableReader>> level_readers = open_readers_[level];
     if (level == 0) {
+        // sort newest-first by file number so the merge below lets the
+        // newest L0 file win on duplicate keys within L0 itself.
         std::vector<size_t> idx(level_files.size());
         for (size_t i = 0; i < idx.size(); i++) idx[i] = i;
         std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) {
@@ -278,6 +297,9 @@ Status DB::CompactLocked(int level) {
     std::vector<FileMetaData> next_files = version_.Level(target_level);
     std::vector<std::shared_ptr<SSTableReader>> next_readers = open_readers_[target_level];
 
+    // Merge oldest-to-newest so later inserts win: target level first
+    // (oldest), then `level`'s files from oldest to newest (so for L0,
+    // the newest L0 file's entries end up last / winning).
     std::map<std::string, SSTableEntry> merged;
     for (auto& reader : next_readers) {
         std::vector<SSTableEntry> entries;
@@ -334,6 +356,8 @@ Status DB::CompactLocked(int level) {
     Status s = flush_batch();
     if (!s.ok()) return s;
 
+    // Record old files so we can delete them from disk once the new
+    // manifest (pointing only at the new files) is safely persisted.
     std::vector<uint64_t> old_numbers;
     for (const auto& fm : version_.Level(level)) old_numbers.push_back(fm.number);
     for (const auto& fm : version_.Level(target_level)) old_numbers.push_back(fm.number);
@@ -361,6 +385,8 @@ Status DB::Get(const ReadOptions& opts, const Slice& key, std::string* value) {
         return deleted ? Status::NotFound(key.ToString()) : Status::OK();
     }
 
+    // L0: files may overlap in key range and aren't sorted by recency on
+    // disk, so check every file, newest (highest file number) first.
     std::vector<std::pair<uint64_t, std::shared_ptr<SSTableReader>>> l0;
     const auto& l0_meta = version_.Level(0);
     for (size_t i = 0; i < l0_meta.size(); i++) {
@@ -373,6 +399,8 @@ Status DB::Get(const ReadOptions& opts, const Slice& key, std::string* value) {
         }
     }
 
+    // L1+: each level's files are non-overlapping, so a simple range
+    // check per file (via min/max key) narrows the search before Get().
     for (int lvl = 1; lvl < kMaxLevels; lvl++) {
         const auto& metas = version_.Level(lvl);
         for (size_t i = 0; i < metas.size(); i++) {
@@ -390,6 +418,10 @@ std::unique_ptr<Iterator> DB::NewIterator(const ReadOptions& /*opts*/) {
     std::lock_guard<std::mutex> lock(mutex_);
     std::map<std::string, std::string> snapshot;
 
+    // Oldest to newest: deepest level first, L0 newest-file-last, memtable
+    // last of all -- so later insertions correctly overwrite earlier ones,
+    // and tombstones (represented by erasing any prior entry, then not
+    // reinserting) correctly hide older values.
     auto apply_entries = [&](const std::vector<SSTableEntry>& entries) {
         for (const auto& e : entries) {
             if (e.type == EntryType::kDelete) {
@@ -465,10 +497,13 @@ void DB::BackgroundLoop() {
         while (s.ok() && NeedsCompactionLocked(&level)) {
             s = CompactLocked(level);
         }
+        // Errors here are not surfaced to any caller (there isn't one, on
+        // a background thread) -- a real deployment would route this to a
+        // logging/alerting hook via a background-error callback option.
 
         bg_idle_ = true;
         bg_idle_cv_.notify_all();
     }
 }
 
-}
+}  // namespace clomdb

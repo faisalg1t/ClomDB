@@ -1,4 +1,5 @@
 #pragma once
+// Single include that pulls in the full ClomDB public API.
 #include "clomdb/db.h"
 #include "clomdb/iterator.h"
 #include "clomdb/options.h"

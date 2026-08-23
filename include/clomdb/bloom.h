@@ -7,6 +7,9 @@
 namespace clomdb {
 
 inline uint32_t BloomHash(const Slice& key) {
+    // Murmur2-style hash (public domain algorithm), matches the classic
+    // LevelDB bloom filter hash so the double-hashing trick below spreads
+    // bits well in practice.
     const uint32_t seed = 0xbc9f1d34;
     const uint32_t m = 0xc6a4a793;
     uint32_t h = seed ^ static_cast<uint32_t>(key.size() * m);
@@ -33,10 +36,12 @@ inline uint32_t BloomHash(const Slice& key) {
     return h;
 }
 
+// A classic Bloom filter, built once from a batch of keys (used per
+// SSTable to skip disk reads for keys that definitely aren't present).
 class BloomFilter {
 public:
     static std::string Build(const std::vector<std::string>& keys, int bits_per_key) {
-        int k = static_cast<int>(bits_per_key * 0.69);
+        int k = static_cast<int>(bits_per_key * 0.69);  // ln(2)
         if (k < 1) k = 1;
         if (k > 30) k = 30;
 
@@ -46,11 +51,11 @@ public:
         bits = bytes * 8;
 
         std::string filter(bytes, static_cast<char>(0));
-        filter.push_back(static_cast<char>(k));
+        filter.push_back(static_cast<char>(k));  // store k as trailing byte
 
         for (const auto& key : keys) {
             uint32_t h = BloomHash(key);
-            const uint32_t delta = (h >> 17) | (h << 15);
+            const uint32_t delta = (h >> 17) | (h << 15);  // rotate for 2nd hash
             for (int j = 0; j < k; j++) {
                 uint32_t bitpos = h % bits;
                 filter[bitpos / 8] |= static_cast<char>(1 << (bitpos % 8));
@@ -62,12 +67,12 @@ public:
 
     static bool MayContain(const Slice& filter, const Slice& key) {
         size_t len = filter.size();
-        if (len < 1) return true;
+        if (len < 1) return true;  // malformed filter: fail open
         size_t bytes = len - 1;
         size_t bits = bytes * 8;
         if (bits == 0) return true;
         int k = static_cast<uint8_t>(filter[len - 1]);
-        if (k > 30) return true;
+        if (k > 30) return true;  // treat as "no filter" for forward-compat
 
         uint32_t h = BloomHash(key);
         const uint32_t delta = (h >> 17) | (h << 15);
@@ -82,4 +87,4 @@ public:
     }
 };
 
-}
+}  // namespace clomdb

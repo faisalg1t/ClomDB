@@ -20,7 +20,7 @@ void EncodeEntry(std::string* dst, const SSTableEntry& e) {
     }
 }
 
-}
+}  // namespace
 
 Status SSTableWriter::Write(const std::string& path, const std::vector<SSTableEntry>& entries,
                              int bloom_bits_per_key) {
@@ -187,6 +187,9 @@ bool SSTableReader::Get(const Slice& key, std::string* value, bool* deleted,
     if (std::fread(&type_byte, 1, 1, f) != 1) return false;
 
     char lenbuf[5];
+    // Read up to 5 bytes for the varint key length, but we already know
+    // the key length equals key.size() worth of bytes following, so just
+    // decode the varint properly by reading incrementally.
     uint32_t klen = 0;
     {
         std::string tmp;
@@ -278,4 +281,4 @@ Status SSTableReader::ReadAll(std::vector<SSTableEntry>* out) const {
     return Status::OK();
 }
 
-}
+}  // namespace clomdb

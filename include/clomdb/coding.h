@@ -6,6 +6,7 @@
 
 namespace clomdb {
 
+// ---- Fixed-width little-endian encode/decode ----
 
 inline void PutFixed32(std::string* dst, uint32_t v) {
     char buf[4];
@@ -31,6 +32,7 @@ inline uint64_t DecodeFixed64(const char* p) {
     return v;
 }
 
+// ---- Varint encode/decode (LEB128-style, as used by protobuf/LevelDB) ----
 
 inline void PutVarint32(std::string* dst, uint32_t v) {
     unsigned char buf[5];
@@ -59,6 +61,8 @@ inline void PutLengthPrefixedSlice(std::string* dst, const Slice& value) {
     dst->append(value.data(), value.size());
 }
 
+// Returns pointer past the parsed varint, or nullptr on malformed input
+// (would read past `limit`).
 inline const char* GetVarint32Ptr(const char* p, const char* limit, uint32_t* value) {
     uint32_t result = 0;
     for (int shift = 0; shift <= 28 && p < limit; shift += 7) {
@@ -89,6 +93,8 @@ inline const char* GetVarint64Ptr(const char* p, const char* limit, uint64_t* va
     return nullptr;
 }
 
+// Parses a length-prefixed slice from *input, advancing it past the slice.
+// Returns false on malformed/truncated input.
 inline bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
     uint32_t len;
     const char* p = GetVarint32Ptr(input->data(), input->data() + input->size(), &len);
@@ -100,6 +106,9 @@ inline bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
     return true;
 }
 
+// ---- CRC32C (Castagnoli), byte-wise table implementation ----
+// Not the fastest possible (no SSE4.2/hardware intrinsics), but portable
+// and correct, which matters more for a from-scratch storage engine.
 class CRC32C {
 public:
     static uint32_t Extend(uint32_t crc, const char* data, size_t n) {
@@ -113,6 +122,8 @@ public:
     }
     static uint32_t Value(const char* data, size_t n) { return Extend(0, data, n); }
 
+    // Mask a CRC before storing it on disk, as LevelDB/RocksDB do, so that
+    // accidentally-all-zero regions don't look like valid checksums.
     static uint32_t Mask(uint32_t crc) {
         return ((crc >> 15) | (crc << 17)) + 0xa282ead8u;
     }
@@ -139,4 +150,4 @@ private:
     }
 };
 
-}
+}  // namespace clomdb

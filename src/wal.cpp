@@ -45,6 +45,8 @@ Status WriteAheadLog::AddRecord(const Slice& data, bool sync) {
     if (sync) {
         return Sync();
     }
+    // Always flush libc buffers so at minimum a process crash (not just a
+    // clean exit) doesn't lose data sitting in userspace stdio buffers.
     if (std::fflush(file_) != 0) {
         return Status::IOError(path_ + ": fflush failed: " + std::strerror(errno));
     }
@@ -57,6 +59,7 @@ Status WriteAheadLog::Sync() {
         return Status::IOError(path_ + ": fflush failed: " + std::strerror(errno));
     }
 #if defined(_WIN32)
+    // best effort; Windows path not the primary target platform.
 #else
     if (fsync(fileno(file_)) != 0) {
         return Status::IOError(path_ + ": fsync failed: " + std::strerror(errno));
@@ -79,7 +82,7 @@ Status WriteAheadLog::ReplayAll(const std::string& path,
                                  const std::function<void(const Slice&)>& callback) {
     std::FILE* f = std::fopen(path.c_str(), "rb");
     if (f == nullptr) {
-        if (errno == ENOENT) return Status::OK();
+        if (errno == ENOENT) return Status::OK();  // nothing to replay yet
         return Status::IOError(path + ": " + std::strerror(errno));
     }
 
@@ -87,7 +90,7 @@ Status WriteAheadLog::ReplayAll(const std::string& path,
     for (;;) {
         char header[8];
         size_t got = std::fread(header, 1, 8, f);
-        if (got < 8) break;
+        if (got < 8) break;  // EOF or torn trailing record -- stop cleanly
 
         uint32_t stored_crc = CRC32C::Unmask(DecodeFixed32(header));
         uint32_t length = DecodeFixed32(header + 4);
@@ -95,7 +98,7 @@ Status WriteAheadLog::ReplayAll(const std::string& path,
         buf.resize(length);
         if (length > 0) {
             size_t payload_got = std::fread(buf.data(), 1, length, f);
-            if (payload_got < length) break;
+            if (payload_got < length) break;  // torn write at tail
         }
 
         std::string framed;
@@ -104,6 +107,11 @@ Status WriteAheadLog::ReplayAll(const std::string& path,
         framed.append(buf.data(), length);
         uint32_t computed_crc = CRC32C::Value(framed.data(), framed.size());
         if (computed_crc != stored_crc) {
+            // Checksum mismatch at the tail is treated the same as a torn
+            // write (stop replay here); mismatches earlier in the file
+            // indicate genuine corruption but we still stop rather than
+            // silently skip, since later records may depend on earlier
+            // ones for correctness.
             break;
         }
 
@@ -113,4 +121,4 @@ Status WriteAheadLog::ReplayAll(const std::string& path,
     return Status::OK();
 }
 
-}
+}  // namespace clomdb

@@ -23,6 +23,8 @@ CLOMDB_TEST(BloomReasonableFalsePositiveRate) {
         std::string absent = "absent-" + std::to_string(i);
         if (BloomFilter::MayContain(filter, Slice(absent))) false_positives++;
     }
+    // At 10 bits/key we expect roughly ~1% FP rate; allow generous slack
+    // since this is a statistical property, not an exact one.
     CHECK(false_positives < trials / 10);
 }
 

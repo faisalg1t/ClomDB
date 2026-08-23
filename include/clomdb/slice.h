@@ -5,6 +5,8 @@
 
 namespace clomdb {
 
+// A Slice is a simple, non-owning view over a byte array. Cheap to copy;
+// the caller must ensure the underlying storage outlives the Slice.
 class Slice {
 public:
     Slice() : data_(""), size_(0) {}
@@ -46,4 +48,4 @@ inline bool operator==(const Slice& a, const Slice& b) {
 inline bool operator!=(const Slice& a, const Slice& b) { return !(a == b); }
 inline bool operator<(const Slice& a, const Slice& b) { return a.compare(b) < 0; }
 
-}
+}  // namespace clomdb

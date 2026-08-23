@@ -45,6 +45,7 @@ CLOMDB_TEST(WalTornTailRecordIsSkippedNotFatal) {
         CHECK(wal.AddRecord(Slice("good record"), true).ok());
         CHECK(wal.Close().ok());
     }
+    // Simulate a crash mid-write: append a truncated, bogus trailing record.
     {
         std::FILE* f = std::fopen(path.c_str(), "ab");
         const char garbage[] = {0x01, 0x02, 0x03};

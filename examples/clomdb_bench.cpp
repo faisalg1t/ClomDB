@@ -1,3 +1,6 @@
+// Rough throughput benchmark: sequential writes, random reads.
+// Not a substitute for a real benchmark suite (no percentile latencies,
+// no varied value-size distributions) -- gives a ballpark sanity check.
 #include <algorithm>
 #include <chrono>
 #include <cstdio>

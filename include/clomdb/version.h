@@ -6,15 +6,23 @@
 
 namespace clomdb {
 
+// Maximum number of levels. L0 holds recently-flushed, possibly
+// key-overlapping tables; L1..kMaxLevels-1 are sorted and non-overlapping
+// within each level, sized geometrically (see Options::level_size_multiplier).
 constexpr int kMaxLevels = 6;
 
 struct FileMetaData {
-    uint64_t number = 0;
+    uint64_t number = 0;   // used to derive the on-disk filename
     std::string min_key;
     std::string max_key;
     uint64_t file_size = 0;
 };
 
+// The current set of live SSTable files, grouped by level. Persisted to a
+// MANIFEST file as a full snapshot (rather than an incremental edit log)
+// every time it changes -- simpler to reason about and to recover, at the
+// cost of a full rewrite per flush/compaction, which is cheap since the
+// manifest is just file metadata, not the data itself.
 class Version {
 public:
     Version() : levels_(kMaxLevels) {}
@@ -32,4 +40,4 @@ private:
     std::vector<std::vector<FileMetaData>> levels_;
 };
 
-}
+}  // namespace clomdb

@@ -7,7 +7,7 @@
 namespace clomdb {
 
 namespace {
-constexpr uint64_t kManifestMagic = 0x436c6f6d444d4631ULL;
+constexpr uint64_t kManifestMagic = 0x436c6f6d444d4631ULL;  // "ClomDMF1"
 }
 
 Status Version::Save(const std::string& manifest_path) const {
@@ -114,4 +114,4 @@ Status Version::Load(const std::string& manifest_path) {
     return Status::OK();
 }
 
-}
+}  // namespace clomdb
