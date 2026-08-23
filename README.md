@@ -21,9 +21,10 @@ db->Delete(WriteOptions(), "key");
 
 auto it = db->NewIterator(ReadOptions());
 for (it->SeekToFirst(); it->Valid(); it->Next()) {
+    // it->key(), it->value()
 }
 
-delete db;
+delete db;  // flushes and closes automatically
 ```
 
 ## Design
@@ -127,6 +128,9 @@ src/              implementation
 examples/         CLI + benchmark
 tests/            unit + end-to-end tests (custom header-only harness, no external deps)
 ```
+
+See `DESIGN.md` for the design reasoning behind non-obvious decisions
+(WAL framing, compaction/tombstone rules, locking model, etc.).
 
 ## License
 
