@@ -154,4 +154,4 @@ tests/            unit + end-to-end tests (custom header-only harness, no extern
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [LICENSE](/LICENSE)
