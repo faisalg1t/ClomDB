@@ -39,7 +39,7 @@ jobs:
           cp build/clomdb_bench dist/${{ matrix.artifact_name }}/bin/
           cp build/libclomdb.a dist/${{ matrix.artifact_name }}/lib/
           cp -r include/clomdb dist/${{ matrix.artifact_name }}/include/
-          cp README.md DESIGN.md LICENSE dist/${{ matrix.artifact_name }}/
+          cp README.md LICENSE dist/${{ matrix.artifact_name }}/
           tar -czf ${{ matrix.artifact_name }}.tar.gz -C dist ${{ matrix.artifact_name }}
 
       - name: Upload artifact
