@@ -1,7 +1,7 @@
 # ClomDB
 
-[![CI](https://github.com/faisalg1t/ClomDB/actions/workflows/ci.yml/badge.svg)](https://github.com/faisalg1t/ClomDB/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/faisalg1t/ClomDB)](https://github.com/faisalg1t/ClomDB/releases/latest)
+[![CI](https://github.com/faisaljs/ClomDB/actions/workflows/ci.yml/badge.svg)](https://github.com/faisaljs/ClomDB/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/faisaljs/ClomDB)](https://github.com/faisaljs/ClomDB/releases/latest)
 
 ClomDB is an embedded, durable, LSM-tree-backed key-value store written in
 C++17, with no dependencies beyond the standard library and pthreads.
@@ -10,8 +10,8 @@ C++17, with no dependencies beyond the standard library and pthreads.
 
 No build step needed — grab the latest release for your platform:
 
-* **Linux (x86_64):** [clomdb-linux-x86_64.tar.gz](https://github.com/faisalg1t/ClomDB/releases/latest/download/clomdb-linux-x86_64.tar.gz)
-* **macOS (Apple Silicon):** [clomdb-macos-arm64.tar.gz](https://github.com/faisalg1t/ClomDB/releases/latest/download/clomdb-macos-arm64.tar.gz)
+* **Linux (x86_64):** [clomdb-linux-x86_64.tar.gz](https://github.com/faisaljs/ClomDB/releases/latest/download/clomdb-linux-x86_64.tar.gz)
+* **macOS (Apple Silicon):** [clomdb-macos-arm64.tar.gz](https://github.com/faisaljs/ClomDB/releases/latest/download/clomdb-macos-arm64.tar.gz)
 
 ```sh
 tar xzf clomdb-<platform>.tar.gz
@@ -22,7 +22,7 @@ cd clomdb-<platform>
 
 Each archive includes `bin/clomdb_cli`, `bin/clomdb_bench`, `lib/libclomdb.a`,
 and the `include/clomdb/` headers needed to link the library into your own
-C++ project. See [all releases](https://github.com/faisalg1t/ClomDB/releases).
+C++ project. See [all releases](https://github.com/faisaljs/ClomDB/releases).
 
 ## Using it as a library
 
